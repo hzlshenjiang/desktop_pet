@@ -282,10 +282,10 @@ class PetWidget(QWidget):
 
         self.update_pet_size()
 
-        # 将窗口移动到屏幕中央偏下（更明显的位置）
+        # 将窗口移动到屏幕中央
         screen = QApplication.primaryScreen().geometry()
         x = (screen.width() - self.width()) // 2
-        y = screen.height() - self.height() - 100  # 距离底部100像素
+        y = (screen.height() - self.height()) // 2
         self.move(x, y)
 
     def update_pet_size(self):
