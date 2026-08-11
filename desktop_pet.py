@@ -48,12 +48,6 @@ from PyQt5.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, Q
 import pynput_patch  # noqa: F401
 from pynput_patch import keyboard, mouse
 
-# 单实例守卫
-from single_instance import check_single_instance, release_instance
-
-if not check_single_instance():
-    sys.exit(0)
-
 
 def resource_path(relative_path):
     """获取资源文件路径（兼容PyInstaller打包）"""
@@ -584,16 +578,16 @@ class PetWidget(QWidget):
         painter.setPen(QPen(QColor(60, 60, 60, 200), 1))
 
         # 箭头形状
-        # 箭头形状 - 标准Windows鼠标箭头
         cursor = QPolygon([
-            QPoint(x + cursor_size, y),                    # 顶部尖端
-            QPoint(x, y + cursor_size),                    # 左下角
-            QPoint(x + cursor_size, y + cursor_size),      # 右下角
-            QPoint(x + cursor_size, y + cursor_size // 2), # 右侧中间
-            QPoint(x + cursor_size // 2, y + cursor_size // 2), # 中间凹陷
-            QPoint(x + cursor_size // 2, y),               # 顶部凹陷
+            QPoint(x, y),
+            QPoint(x, y + cursor_size),
+            QPoint(x + cursor_size // 3, y + cursor_size * 2 // 3),
+            QPoint(x + cursor_size // 2, y + cursor_size),
+            QPoint(x + cursor_size * 2 // 3, y + cursor_size * 5 // 6),
+            QPoint(x + cursor_size * 2 // 3, y + cursor_size * 2 // 3),
         ])
         painter.drawPolygon(cursor)
+
     def draw_blink(self, painter, w, h):
         if self.blink_progress <= 0.01:
             return
@@ -748,15 +742,6 @@ def main():
     pet = PetWidget()
     pet.show()
     sys.exit(app.exec_())
-    release_instance()  # 释放单实例锁
-
-def cleanup_on_exit():
-    """退出时清理"""
-    import atexit
-    atexit.register(release_instance)
-
-# 注册退出清理
-cleanup_on_exit()
 
 
 if __name__ == "__main__":
