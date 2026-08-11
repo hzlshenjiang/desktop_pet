@@ -752,8 +752,17 @@ def main():
 
     # 启动单实例激活监听
     def on_activate():
-        pet.raise_()
-        pet.activateWindow()
+        # 如果当前没有置顶，临时置顶一次拉到前台，然后恢复
+        if not pet.is_top:
+            pet.setWindowFlags(pet.windowFlags() | Qt.WindowStaysOnTopHint)
+            pet.show()
+            pet.raise_()
+            pet.activateWindow()
+            # 延时恢复窗口标志（非置顶）
+            QTimer.singleShot(200, lambda: pet.setWindowFlags(pet.windowFlags() & ~Qt.WindowStaysOnTopHint) or pet.show())
+        else:
+            pet.raise_()
+            pet.activateWindow()
 
     _single_guard.start_activation_server(on_activate)
 
