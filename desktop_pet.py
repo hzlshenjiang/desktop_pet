@@ -526,14 +526,21 @@ class PetWidget(QWidget):
         w = self.width()
         h = self.height()
 
+        # 绘制半透明白色背景
+        painter.fillRect(0, 0, w, h, QColor(255, 255, 255, 30))
+
         # 应用呼吸偏移
         painter.translate(self.idle_sway_x, self.idle_offset_y)
 
         # 绘制角色图片
-        scaled_pixmap = self.original_pixmap.scaled(
-            w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation
-        )
-        painter.drawPixmap(0, 0, scaled_pixmap)
+        if self.original_pixmap.isNull():
+            print("警告: original_pixmap 为空!")
+        else:
+            print(f"绘制图片: {self.original_pixmap.width()}x{self.original_pixmap.height()}")
+            scaled_pixmap = self.original_pixmap.scaled(
+                w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            painter.drawPixmap(0, 0, scaled_pixmap)
 
         # 绘制键盘按键高亮
         self.draw_key_highlights(painter, w, h)
