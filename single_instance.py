@@ -41,13 +41,13 @@ class SingleInstanceGuard:
             
             # 尝试获取排他锁（跨平台兼容）
             if os.name == 'nt':
-                # Windows: 使用ctypes获取文件锁
+                # Windows: 使用CreateFile获取文件锁
                 handle = ctypes.windll.kernel32.CreateFileW(
                     self.lock_path,
+                    0x80000000,  # GENERIC_READ
                     0,  # 共享模式：不共享
-                    3,  # 访问模式：无（仅用于锁）
                     None,
-                    1,  # 创建模式：打开现有
+                    3,  # 创建模式：打开现有
                     0,  # 文件属性
                     None
                 )
