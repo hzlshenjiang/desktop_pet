@@ -42,7 +42,7 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QMenu, QAction,
                              QVBoxLayout, QSystemTrayIcon)
 from PyQt5.QtGui import (QPixmap, QPainter, QColor, QFont, QPolygon, QIcon,
                          QRadialGradient, QBrush, QPen)
-from PyQt5.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, QRect, QSize, QCoreApplication, QEvent
+from PyQt5.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, QRect, QSize
 
 # 全局键鼠监听
 import pynput_patch  # noqa: F401
@@ -50,6 +50,9 @@ from pynput_patch import keyboard, mouse
 
 # 单实例守卫
 from single_instance_guard import SingleInstanceGuard
+
+# 全局守卫引用，防止被释放
+_single_guard = None
 
 
 def resource_path(relative_path):
@@ -276,11 +279,6 @@ class PetWidget(QWidget):
 
         self.original_pixmap = QPixmap(resource_path("character.png"))
         self.img_size = self.original_pixmap.width()  # 正方形图片
-
-        # 设置窗口图标
-        icon_path = resource_path("icon.ico")
-        if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
 
         self.update_pet_size()
         self.move(300, 300)
@@ -740,9 +738,11 @@ class PetWidget(QWidget):
 
 
 def main():
+    global _single_guard
+
     # 单实例守卫
-    guard = SingleInstanceGuard("desktop_pet")
-    if not guard.acquire():
+    _single_guard = SingleInstanceGuard("desktop_pet")
+    if not _single_guard.acquire():
         # 已有实例在运行，退出当前进程
         print("Another instance is already running, exiting...")
         sys.exit(0)
@@ -750,33 +750,12 @@ def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    # 连接单实例激活信号
+    # 启动单实例激活监听
     def on_activate():
         pet.raise_()
         pet.activateWindow()
 
-    # 注册自定义事件类型
-    ACTIVATE_EVENT_TYPE = QEvent.registerEventType()
-
-    class ActivateEvent(QEvent):
-        def __init__(self):
-            super().__init__(ActivateEvent.Type if hasattr(QEvent, 'Type') else ACTIVATE_EVENT_TYPE)
-
-    # 重写 QApplication 的 notify 方法来处理自定义事件
-    original_notify = app.notify
-
-    def custom_notify(receiver, event):
-        if event.type() == ACTIVATE_EVENT_TYPE:
-            on_activate()
-        return original_notify(receiver, event)
-
-    app.notify = custom_notify
-
-    # 修改 SingleInstanceGuard 的 _send_activate_signal 方法
-    original_send = guard._send_activate_signal
-    def patched_send():
-        QCoreApplication.postEvent(app, ActivateEvent())
-    guard._send_activate_signal = patched_send
+    _single_guard.start_activation_server(on_activate)
 
     pet = PetWidget()
     pet.show()
