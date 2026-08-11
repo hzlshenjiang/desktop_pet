@@ -55,6 +55,51 @@ from single_instance_guard import SingleInstanceGuard
 _single_guard = None
 
 
+def bring_to_front(widget):
+    """参考QZCAD MainWindow::bringToFront实现，把窗口拉到前台
+    QZCAD源码:
+        if (isMinimized()) showNormal();
+        else if (!isVisible()) show();
+        raise(); activateWindow();
+    针对 Qt.Tool 无边框窗口，追加 win32 API 强制激活（Windows 会阻止后台进程抢焦点，
+    普通 raise/activateWindow 对 Qt.Tool 窗口常失效）。
+    """
+    # 1. 恢复最小化 / 显示隐藏窗口（同 QZCAD）
+    if widget.isMinimized():
+        widget.showNormal()
+    elif not widget.isVisible():
+        widget.show()
+
+    # 2. Qt 标准方式（同 QZCAD）
+    widget.raise_()
+    widget.activateWindow()
+
+    # 3. win32 API 强制置顶激活（仅 Windows）
+    try:
+        import ctypes
+        from ctypes import wintypes
+        hwnd = int(widget.winId())
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+
+        # 附加到前台进程的输入队列，绕过 SetForegroundWindow 限制
+        fg_hwnd = user32.GetForegroundWindow()
+        fg_thread = user32.GetWindowThreadProcessId(fg_hwnd, None)
+        cur_thread = kernel32.GetCurrentThreadId()
+        attached = False
+        if fg_thread != cur_thread:
+            attached = user32.AttachThreadInput(cur_thread, fg_thread, True) != 0
+
+        user32.BringWindowToTop(hwnd)
+        user32.SetForegroundWindow(hwnd)
+        user32.SetActiveWindow(hwnd)
+
+        if attached:
+            user32.AttachThreadInput(cur_thread, fg_thread, False)
+    except Exception:
+        pass
+
+
 def resource_path(relative_path):
     """获取资源文件路径（兼容PyInstaller打包）"""
     if hasattr(sys, '_MEIPASS'):
@@ -756,13 +801,12 @@ def main():
         if not pet.is_top:
             pet.setWindowFlags(pet.windowFlags() | Qt.WindowStaysOnTopHint)
             pet.show()
-            pet.raise_()
-            pet.activateWindow()
+            # 先置顶拉到前台
+            bring_to_front(pet)
             # 延时恢复窗口标志（非置顶）
             QTimer.singleShot(200, lambda: pet.setWindowFlags(pet.windowFlags() & ~Qt.WindowStaysOnTopHint) or pet.show())
         else:
-            pet.raise_()
-            pet.activateWindow()
+            bring_to_front(pet)
 
     _single_guard.start_activation_server(on_activate)
 
