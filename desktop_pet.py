@@ -282,10 +282,10 @@ class PetWidget(QWidget):
 
         self.update_pet_size()
 
-        # 将窗口移动到屏幕中央
+        # 将窗口移动到屏幕中央偏下（更明显的位置）
         screen = QApplication.primaryScreen().geometry()
         x = (screen.width() - self.width()) // 2
-        y = (screen.height() - self.height()) // 2
+        y = screen.height() - self.height() - 100  # 距离底部100像素
         self.move(x, y)
 
     def update_pet_size(self):
@@ -488,7 +488,10 @@ class PetWidget(QWidget):
 
     def on_mouse_move(self, x, y):
         # 检查窗口是否还存在
-        if not self.windowHandle():
+        try:
+            if not self.windowHandle():
+                return
+        except RuntimeError:
             return
 
         # 获取屏幕尺寸
