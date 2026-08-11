@@ -526,9 +526,6 @@ class PetWidget(QWidget):
         w = self.width()
         h = self.height()
 
-        # 绘制半透明白色背景
-        painter.fillRect(0, 0, w, h, QColor(255, 255, 255, 30))
-
         # 应用呼吸偏移
         painter.translate(self.idle_sway_x, self.idle_offset_y)
 
