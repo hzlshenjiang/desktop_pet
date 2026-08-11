@@ -1,11 +1,10 @@
 """
 防止多开的锁文件管理器
+简化版：只检查文件是否存在，不使用文件锁
 """
 import os
 import sys
 import time
-import ctypes
-import threading
 
 class SingleInstanceGuard:
     """
@@ -15,8 +14,8 @@ class SingleInstanceGuard:
     
     def __init__(self, name="desktop_pet"):
         self.name = name
-        self.lock_file = None
         self.lock_path = None
+        self.lock_file = None
         
     def acquire(self):
         """
@@ -33,39 +32,37 @@ class SingleInstanceGuard:
             
             self.lock_path = os.path.join(base_dir, f'.{self.name}.lock')
             
-            # 尝试创建锁文件
+            # 检查锁文件是否存在
+            if os.path.exists(self.lock_path):
+                # 锁文件存在，但可能进程已结束
+                try:
+                    with open(self.lock_path, 'r') as f:
+                        lines = f.readlines()
+                        if len(lines) >= 1:
+                            pid = int(lines[0].strip())
+                            # 检查进程是否还在运行
+                            import subprocess
+                            subprocess.run(['tasklist', '/FI', f'PID eq {pid}', '/NH'], 
+                                        capture_output=True)
+                            if subprocess.run(['tasklist', '/FI', f'PID eq {pid}', '/NH'],
+                                           capture_output=True).returncode != 0:
+                                # 进程不存在，删除旧锁文件
+                                os.remove(self.lock_path)
+                            else:
+                                # 进程还在运行
+                                return False
+                except (ValueError, IOError):
+                    # 锁文件格式错误，删除并重新创建
+                    try:
+                        os.remove(self.lock_path)
+                    except:
+                        pass
+            
+            # 创建锁文件
             self.lock_file = open(self.lock_path, 'w')
             self.lock_file.write(f'{os.getpid()}\n')
             self.lock_file.write(f'{time.time()}\n')
             self.lock_file.flush()
-            
-            # 尝试获取排他锁（跨平台兼容）
-            if os.name == 'nt':
-                # Windows: 使用CreateFile获取文件锁
-                handle = ctypes.windll.kernel32.CreateFileW(
-                    self.lock_path,
-                    0x80000000,  # GENERIC_READ
-                    0,  # 共享模式：不共享
-                    None,
-                    3,  # 创建模式：打开现有
-                    0,  # 文件属性
-                    None
-                )
-                if handle == -1:  # INVALID_HANDLE_VALUE
-                    self.lock_file.close()
-                    self.lock_file = None
-                    return False
-                # 存储句柄用于后续释放
-                self._handle = handle
-            else:
-                # Unix: 使用flock
-                import fcntl
-                try:
-                    fcntl.flock(self.lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except (IOError, OSError):
-                    self.lock_file.close()
-                    self.lock_file = None
-                    return False
             
             return True
             
@@ -79,9 +76,6 @@ class SingleInstanceGuard:
     def release(self):
         """释放锁"""
         try:
-            if hasattr(self, '_handle'):
-                ctypes.windll.kernel32.CloseHandle(self._handle)
-            
             if self.lock_file:
                 self.lock_file.close()
                 self.lock_file = None
@@ -127,11 +121,3 @@ def release_instance():
     """释放实例锁"""
     guard = get_guard()
     guard.release()
-
-def cleanup_lock():
-    """清理锁文件（用于异常退出时）"""
-    try:
-        if os.path.exists(_guard.lock_path if _guard else None):
-            os.remove(_guard.lock_path)
-    except:
-        pass
