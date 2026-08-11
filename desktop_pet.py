@@ -48,6 +48,12 @@ from PyQt5.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, Q
 import pynput_patch  # noqa: F401
 from pynput_patch import keyboard, mouse
 
+# 单实例守卫
+from single_instance_guard import SingleInstanceGuard
+
+# 全局守卫引用，防止被释放
+_single_guard = None
+
 
 def resource_path(relative_path):
     """获取资源文件路径（兼容PyInstaller打包）"""
@@ -732,8 +738,25 @@ class PetWidget(QWidget):
 
 
 def main():
+    global _single_guard
+
+    # 单实例守卫
+    _single_guard = SingleInstanceGuard("desktop_pet")
+    if not _single_guard.acquire():
+        # 已有实例在运行，退出当前进程
+        print("Another instance is already running, exiting...")
+        sys.exit(0)
+
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+
+    # 启动单实例激活监听
+    def on_activate():
+        pet.raise_()
+        pet.activateWindow()
+
+    _single_guard.start_activation_server(on_activate)
+
     pet = PetWidget()
     pet.show()
     sys.exit(app.exec_())
