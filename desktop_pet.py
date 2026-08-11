@@ -42,11 +42,14 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QMenu, QAction,
                              QVBoxLayout, QSystemTrayIcon)
 from PyQt5.QtGui import (QPixmap, QPainter, QColor, QFont, QPolygon, QIcon,
                          QRadialGradient, QBrush, QPen)
-from PyQt5.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, QRect, QSize
+from PyQt5.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, QRect, QSize, QCoreApplication, QEvent
 
 # 全局键鼠监听
 import pynput_patch  # noqa: F401
 from pynput_patch import keyboard, mouse
+
+# 单实例守卫
+from single_instance_guard import SingleInstanceGuard
 
 
 def resource_path(relative_path):
@@ -737,8 +740,44 @@ class PetWidget(QWidget):
 
 
 def main():
+    # 单实例守卫
+    guard = SingleInstanceGuard("desktop_pet")
+    if not guard.acquire():
+        # 已有实例在运行，退出当前进程
+        print("Another instance is already running, exiting...")
+        sys.exit(0)
+
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+
+    # 连接单实例激活信号
+    def on_activate():
+        pet.raise_()
+        pet.activateWindow()
+
+    # 注册自定义事件类型
+    ACTIVATE_EVENT_TYPE = QEvent.registerEventType()
+
+    class ActivateEvent(QEvent):
+        def __init__(self):
+            super().__init__(ActivateEvent.Type if hasattr(QEvent, 'Type') else ACTIVATE_EVENT_TYPE)
+
+    # 重写 QApplication 的 notify 方法来处理自定义事件
+    original_notify = app.notify
+
+    def custom_notify(receiver, event):
+        if event.type() == ACTIVATE_EVENT_TYPE:
+            on_activate()
+        return original_notify(receiver, event)
+
+    app.notify = custom_notify
+
+    # 修改 SingleInstanceGuard 的 _send_activate_signal 方法
+    original_send = guard._send_activate_signal
+    def patched_send():
+        QCoreApplication.postEvent(app, ActivateEvent())
+    guard._send_activate_signal = patched_send
+
     pet = PetWidget()
     pet.show()
     sys.exit(app.exec_())
