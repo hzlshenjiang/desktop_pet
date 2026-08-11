@@ -16,7 +16,7 @@ if %errorlevel% neq 0 (
 
 echo.
 echo [2/3] Building executable...
-pyinstaller desktop_pet.spec
+pyinstaller desktop_pet.spec --clean --noconfirm
 if %errorlevel% neq 0 (
     echo [ERROR] Build failed
     pause

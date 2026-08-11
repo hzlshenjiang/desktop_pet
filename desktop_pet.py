@@ -274,6 +274,11 @@ class PetWidget(QWidget):
         self.original_pixmap = QPixmap(resource_path("character.png"))
         self.img_size = self.original_pixmap.width()  # 正方形图片
 
+        # 设置窗口图标
+        icon_path = resource_path("icon.ico")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+
         self.update_pet_size()
         self.move(300, 300)
 
