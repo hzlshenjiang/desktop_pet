@@ -578,15 +578,14 @@ class PetWidget(QWidget):
         painter.setBrush(QColor(255, 255, 255, 220))
         painter.setPen(QPen(QColor(60, 60, 60, 200), 1))
 
-        # 标准鼠标箭头形状 - 顶点按顺时针顺序排列
         # 箭头形状
         cursor = QPolygon([
             QPoint(x, y),
             QPoint(x, y + cursor_size),
             QPoint(x + cursor_size // 3, y + cursor_size * 2 // 3),
             QPoint(x + cursor_size // 2, y + cursor_size),
-            QPoint(x + cursor_size, y + cursor_size),
-            QPoint(x + cursor_size, y),
+            QPoint(x + cursor_size * 2 // 3, y + cursor_size * 5 // 6),
+            QPoint(x + cursor_size * 2 // 3, y + cursor_size * 2 // 3),
         ])
         painter.drawPolygon(cursor)
     def draw_blink(self, painter, w, h):
