@@ -4,7 +4,8 @@
 """
 import sys
 import os
-from PyQt5.QtCore import QSharedMemory, QLocalServer, QLocalSocket
+from PyQt5.QtCore import QSharedMemory
+from PyQt5.QtNetwork import QLocalServer, QLocalSocket
 from PyQt5.QtWidgets import QApplication
 
 
