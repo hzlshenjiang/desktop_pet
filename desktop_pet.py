@@ -48,6 +48,12 @@ from PyQt5.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, Q
 import pynput_patch  # noqa: F401
 from pynput_patch import keyboard, mouse
 
+# 单实例守卫
+from single_instance import check_single_instance
+
+if not check_single_instance():
+    sys.exit(0)
+
 
 def resource_path(relative_path):
     """获取资源文件路径（兼容PyInstaller打包）"""
