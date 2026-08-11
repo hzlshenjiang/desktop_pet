@@ -572,17 +572,17 @@ class PetWidget(QWidget):
         painter.setBrush(QColor(255, 255, 255, 220))
         painter.setPen(QPen(QColor(60, 60, 60, 200), 1))
 
-        # 箭头形状
+        # 标准鼠标箭头形状 - 顶点按顺时针顺序排列
+        # 箭头指向右上方
         cursor = QPolygon([
-            QPoint(x, y),
-            QPoint(x, y + cursor_size),
-            QPoint(x + cursor_size // 3, y + cursor_size * 2 // 3),
-            QPoint(x + cursor_size // 2, y + cursor_size),
-            QPoint(x + cursor_size * 2 // 3, y + cursor_size * 5 // 6),
-            QPoint(x + cursor_size * 2 // 3, y + cursor_size * 2 // 3),
+            QPoint(x + cursor_size, y),          # 顶部尖端
+            QPoint(x, y + cursor_size),          # 左下角
+            QPoint(x + cursor_size, y + cursor_size),  # 右下角
+            QPoint(x + cursor_size, y + cursor_size // 2),  # 右侧中间
+            QPoint(x + cursor_size // 2, y + cursor_size // 2),  # 中间凹陷
+            QPoint(x + cursor_size // 2, y),     # 顶部凹陷
         ])
         painter.drawPolygon(cursor)
-
     def draw_blink(self, painter, w, h):
         if self.blink_progress <= 0.01:
             return
