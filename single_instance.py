@@ -127,3 +127,11 @@ def release_instance():
     """释放实例锁"""
     guard = get_guard()
     guard.release()
+
+def cleanup_lock():
+    """清理锁文件（用于异常退出时）"""
+    try:
+        if os.path.exists(_guard.lock_path if _guard else None):
+            os.remove(_guard.lock_path)
+    except:
+        pass

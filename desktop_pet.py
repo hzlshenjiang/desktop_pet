@@ -744,6 +744,14 @@ def main():
     sys.exit(app.exec_())
     release_instance()  # 释放单实例锁
 
+def cleanup_on_exit():
+    """退出时清理"""
+    import atexit
+    atexit.register(release_instance)
+
+# 注册退出清理
+cleanup_on_exit()
+
 
 if __name__ == "__main__":
     main()
