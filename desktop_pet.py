@@ -281,7 +281,12 @@ class PetWidget(QWidget):
         self.img_size = self.original_pixmap.width()  # 正方形图片
 
         self.update_pet_size()
-        self.move(300, 300)
+
+        # 将窗口移动到屏幕中央
+        screen = QApplication.primaryScreen().geometry()
+        x = (screen.width() - self.width()) // 2
+        y = (screen.height() - self.height()) // 2
+        self.move(x, y)
 
     def update_pet_size(self):
         size = int(self.base_size * self.scale)
