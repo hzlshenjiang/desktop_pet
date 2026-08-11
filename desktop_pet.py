@@ -572,14 +572,14 @@ class PetWidget(QWidget):
         painter.setBrush(QColor(255, 255, 255, 220))
         painter.setPen(QPen(QColor(60, 60, 60, 200), 1))
 
-        # 箭头形状
+        # 标准鼠标箭头形状（从顶部尖端开始，顺时针）
         cursor = QPolygon([
-            QPoint(x, y),
-            QPoint(x, y + cursor_size),
-            QPoint(x + cursor_size // 3, y + cursor_size * 2 // 3),
-            QPoint(x + cursor_size // 2, y + cursor_size),
-            QPoint(x + cursor_size * 2 // 3, y + cursor_size * 5 // 6),
-            QPoint(x + cursor_size * 2 // 3, y + cursor_size * 2 // 3),
+            QPoint(x, y),                    # 顶部尖端
+            QPoint(x, y + cursor_size),      # 左下角
+            QPoint(x + cursor_size // 2, y + cursor_size),  # 底部中间
+            QPoint(x + cursor_size * 2 // 3, y + cursor_size * 5 // 6),  # 右下
+            QPoint(x + cursor_size * 2 // 3, y + cursor_size * 2 // 3),  # 右侧中间
+            QPoint(x + cursor_size // 3, y + cursor_size * 2 // 3),  # 左侧凹陷
         ])
         painter.drawPolygon(cursor)
 
