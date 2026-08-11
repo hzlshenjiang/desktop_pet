@@ -481,30 +481,29 @@ class PetWidget(QWidget):
             self.pressed_keys.discard(key_name)
 
     def on_mouse_move(self, x, y):
-        def on_mouse_move(self, x, y):
-            # 检查窗口是否还存在
-            if not self.windowHandle():
-                return
+        # 检查窗口是否还存在
+        if not self.windowHandle():
+            return
 
-            # 获取屏幕尺寸
-            screen = QApplication.primaryScreen().geometry()
-            screen_w = screen.width()
-            screen_h = screen.height()
+        # 获取屏幕尺寸
+        screen = QApplication.primaryScreen().geometry()
+        screen_w = screen.width()
+        screen_h = screen.height()
 
-            # 鼠标在屏幕上的位置比例
-            rx = x / screen_w
-            ry = y / screen_h
+        # 鼠标在屏幕上的位置比例
+        rx = x / screen_w
+        ry = y / screen_h
 
-            # 映射到窗口范围内（留出边距，不让指针跑出角色区域）
-            margin = 0.05
-            cursor_x = int((margin + rx * (1.0 - 2 * margin)) * self.width())
-            cursor_y = int((margin + ry * (1.0 - 2 * margin)) * self.height())
+        # 映射到窗口范围内（留出边距，不让指针跑出角色区域）
+        margin = 0.05
+        cursor_x = int((margin + rx * (1.0 - 2 * margin)) * self.width())
+        cursor_y = int((margin + ry * (1.0 - 2 * margin)) * self.height())
 
-            # 限制在窗口范围内
-            cursor_x = max(0, min(self.width() - 1, cursor_x))
-            cursor_y = max(0, min(self.height() - 1, cursor_y))
+        # 限制在窗口范围内
+        cursor_x = max(0, min(self.width() - 1, cursor_x))
+        cursor_y = max(0, min(self.height() - 1, cursor_y))
 
-            self.cursor_pos = QPoint(cursor_x, cursor_y)
+        self.cursor_pos = QPoint(cursor_x, cursor_y)
 
     def on_mouse_click(self, x, y, button, pressed):
         pass
