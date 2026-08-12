@@ -245,8 +245,9 @@ class BubbleLabel(QLabel):
         self.setText(text)
         metrics = QFontMetrics(self.font())
         max_w = self.maximumWidth()  # 260
-        padding = 20  # 左右边距各10px
-        avail_w = max_w - padding  # 文字可用宽度
+        # 单边11px = 1px边框(rect.adjusted(1,1,-1,-1)) + 10px边距(adjusted(10,5,-10,-10))
+        padding = 22
+        avail_w = max_w - padding  # 文字可用宽度（与paintEvent实际绘制宽度一致）
 
         # 单行所需宽度
         single_w = metrics.horizontalAdvance(text)
