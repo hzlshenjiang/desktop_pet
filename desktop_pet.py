@@ -56,46 +56,31 @@ _single_guard = None
 
 
 def bring_to_front(widget):
-    """参考QZCAD MainWindow::bringToFront实现，把窗口拉到前台
-    QZCAD源码:
-        if (isMinimized()) showNormal();
-        else if (!isVisible()) show();
-        raise(); activateWindow();
-    针对 Qt.Tool 无边框窗口，追加 win32 API 强制激活（Windows 会阻止后台进程抢焦点，
-    普通 raise/activateWindow 对 Qt.Tool 窗口常失效）。
-    """
-    # 1. 恢复最小化 / 显示隐藏窗口（同 QZCAD）
+    """参考QZCAD MainWindow::bringToFront实现，把窗口拉到前台"""
+    # 1. 恢复最小化 / 显示隐藏窗口
     if widget.isMinimized():
         widget.showNormal()
     elif not widget.isVisible():
         widget.show()
 
-    # 2. Qt 标准方式（同 QZCAD）
+    # 2. Qt 标准方式
     widget.raise_()
     widget.activateWindow()
 
-    # 3. win32 API 强制置顶激活（仅 Windows）
+    # 3. win32 API 强制置顶激活
     try:
         import ctypes
-        from ctypes import wintypes
         hwnd = int(widget.winId())
         user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
 
-        # 附加到前台进程的输入队列，绕过 SetForegroundWindow 限制
-        fg_hwnd = user32.GetForegroundWindow()
-        fg_thread = user32.GetWindowThreadProcessId(fg_hwnd, None)
-        cur_thread = kernel32.GetCurrentThreadId()
-        attached = False
-        if fg_thread != cur_thread:
-            attached = user32.AttachThreadInput(cur_thread, fg_thread, True) != 0
-
+        # 先临时置顶（HWND_TOPMOST）再拉到前台，最后恢复（HWND_NOTOPMOST）
+        user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0040)  # HWND_TOPMOST
         user32.BringWindowToTop(hwnd)
         user32.SetForegroundWindow(hwnd)
         user32.SetActiveWindow(hwnd)
-
-        if attached:
-            user32.AttachThreadInput(cur_thread, fg_thread, False)
+        user32.SwitchToThisWindow(hwnd, True)
+        # 恢复非置顶（临时置顶一次，不修改置顶设置）
+        user32.SetWindowPos(hwnd, -2, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0040)  # HWND_NOTOPMOST
     except Exception:
         pass
 
@@ -286,6 +271,7 @@ class BubbleLabel(QLabel):
 class PetWidget(QWidget):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("desktop_pet")  # 窗口标题，用于FindWindow
         self.scale = 1.0
         self.base_size = 280
         self.is_top = True
@@ -412,6 +398,8 @@ class PetWidget(QWidget):
     def hide_pet(self):
         self.hide()
 
+
+    # ===== Windows消息处理（单实例激活） =====
     def quit_app(self):
         self.tray.hide()
         try:
@@ -795,7 +783,10 @@ def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    # 启动单实例激活监听
+    pet = PetWidget()
+    pet.show()
+
+    # 启动单实例激活监听（使用信号连接，线程安全）
     def on_activate():
         # 如果当前没有置顶，临时置顶一次拉到前台，然后恢复
         if not pet.is_top:
@@ -808,10 +799,9 @@ def main():
         else:
             bring_to_front(pet)
 
-    _single_guard.start_activation_server(on_activate)
+    _single_guard.activated.connect(on_activate)
+    _single_guard.start_activation_server()
 
-    pet = PetWidget()
-    pet.show()
     sys.exit(app.exec_())
 
 

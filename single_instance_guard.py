@@ -1,139 +1,133 @@
 """
-单实例守卫模块 - 基于 QSharedMemory + Python标准库socket
-不使用QtNetwork，避免PyInstaller打包问题
+单实例守卫模块 - 基于 PID 文件 + 进程检查
+- PID文件记录主实例PID
+- OpenProcess 检查PID是否存活，区分活跃实例与残留
+- 文件轮询：通过 QTimer.singleShot 递归轮询传递激活信号
 """
-import sys
 import os
-import socket
-import struct
-from PyQt5.QtCore import QSharedMemory, QTimer
+import tempfile
+import ctypes
+from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 
 
-class SingleInstanceGuard:
+class SingleInstanceGuard(QObject):
     """单实例守卫器，防止同一应用多次启动"""
-    
-    # 单实例激活信号事件类型
-    ACTIVATE_EVENT = 0
-    
+
+    activated = pyqtSignal()
+
     def __init__(self, app_name="desktop_pet", user_id=None):
-        """
-        初始化单实例守卫
-        
-        Args:
-            app_name: 应用标识名
-            user_id: 用户标识，默认使用用户名
-        """
-        # 使用用户名作为 user_id，确保多用户环境下独立
+        super().__init__()
         if user_id is None:
             try:
                 user_id = os.getlogin()
-            except:
+            except Exception:
                 import getpass
                 user_id = getpass.getuser()
-        
-        self.app_name = app_name
-        self.user_id = user_id
-        self.shared_memory_key = f"{app_name}_{user_id}"
-        self.socket_port = self._get_socket_port()
-        
-        self.shared_memory = QSharedMemory(self.shared_memory_key)
-        
+
+        self.pid_file = os.path.join(tempfile.gettempdir(),
+                                     f"{app_name}_{user_id}.pid")
+        self.request_file = os.path.join(tempfile.gettempdir(),
+                                         f"{app_name}_{user_id}_activate.txt")
         self.is_primary = False
-        self._cleanup_stale()
-    
-    def _get_socket_port(self):
-        """获取用于单实例通信的端口号"""
-        # 使用固定端口范围，基于app_name和user_id哈希
-        base_port = 19876  # 固定起始端口
-        hash_val = hash(f"{self.app_name}_{self.user_id}") % 1000
-        return base_port + hash_val
-    
-    def _cleanup_stale(self):
-        """清理过期的共享内存"""
-        # 尝试附加到已存在的共享内存
-        if self.shared_memory.attach():
-            # 如果能附加，说明可能有残留，尝试释放
-            self.shared_memory.detach()
-    
+        self._pid = os.getpid()
+
+    def _is_process_alive(self, pid):
+        """检查进程是否存活（Windows OpenProcess）"""
+        try:
+            kernel32 = ctypes.windll.kernel32
+            kernel32.OpenProcess.restype = ctypes.c_void_p
+            handle = kernel32.OpenProcess(0x400, False, pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
+        except:
+            return False
+
     def acquire(self):
-        """
-        尝试获取单实例锁
-        
-        Returns:
-            bool: True 表示是本实例（主实例），False 表示已有实例在运行
-        """
-        # 尝试创建共享内存
-        if self.shared_memory.create(1):
-            # 创建成功，是本实例
+        """检查是否已有实例，并获取单实例锁"""
+        if os.path.exists(self.pid_file):
+            try:
+                with open(self.pid_file, 'r') as f:
+                    old_pid = int(f.read().strip())
+                alive = self._is_process_alive(old_pid)
+                if alive:
+                    self.is_primary = False
+                    self._activate_existing_instance()
+                    return False
+            except:
+                pass
+            try:
+                os.remove(self.pid_file)
+            except:
+                pass
+
+        try:
+            with open(self.pid_file, 'w') as f:
+                f.write(str(self._pid))
             self.is_primary = True
             return True
-        else:
-            # 创建失败，说明已有实例
+        except Exception:
             self.is_primary = False
-            
-            # 尝试连接到已有实例并发送激活请求
-            self._activate_existing_instance()
             return False
-    
+
     def _activate_existing_instance(self):
-        """通知已有实例激活窗口"""
+        """通过文件写入激活请求"""
         try:
-            # 创建TCP socket连接到已有实例
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(0.8)
-            sock.connect(('127.0.0.1', self.socket_port))
-            sock.sendall(b"ACTIVATE")
-            sock.close()
+            with open(self.request_file, 'w') as f:
+                f.write("ACTIVATE")
         except Exception as e:
             print(f"[SingleInstance] 激活请求失败: {e}")
-    
-    def start_activation_server(self, activate_callback):
-        """
-        启动激活监听服务器（仅主实例调用）
-        
-        Args:
-            activate_callback: 激活回调函数
-        """
+
+    def start_activation_server(self):
+        """启动激活监听（通过QTimer递归轮询文件）"""
         if not self.is_primary:
             return
-        
-        self._activate_callback = activate_callback
-        
-        # 启动服务器线程
-        import threading
-        self._server_thread = threading.Thread(target=self._listen_for_activation, daemon=True)
-        self._server_thread.start()
-    
-    def _listen_for_activation(self):
-        """监听激活请求的服务器线程"""
+
         try:
-            server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            server.bind(('127.0.0.1', self.socket_port))
-            server.listen(1)
-            server.settimeout(1.0)
-            
-            while True:
-                try:
-                    conn, addr = server.accept()
-                    data = conn.recv(1024)
-                    if data == b"ACTIVATE":
-                        # 在主线程中调用回调
-                        QTimer.singleShot(0, self._activate_callback)
-                    conn.close()
-                except socket.timeout:
-                    continue
-                except Exception:
-                    break
-            
-            server.close()
-        except Exception as e:
-            print(f"[SingleInstance] 服务器启动失败: {e}")
-    
+            if os.path.exists(self.request_file):
+                os.remove(self.request_file)
+        except:
+            pass
+
+        self._poll()
+
+    def _poll(self):
+        """递归轮询激活请求文件"""
+        self._poll_activation_request()
+        QTimer.singleShot(500, self._poll)
+
+    def _poll_activation_request(self):
+        """轮询检查激活请求文件"""
+        try:
+            if os.path.exists(self.request_file):
+                with open(self.request_file, 'r') as f:
+                    content = f.read().strip()
+                if content == "ACTIVATE":
+                    try:
+                        os.remove(self.request_file)
+                    except:
+                        pass
+                    self.activated.emit()
+        except:
+            pass
+
     def release(self):
-        """释放单实例锁"""
-        if self.is_primary:
-            self.shared_memory.detach()
-    
+                    try:
+                            if os.path.exists(self.pid_file):
+                                    with open(self.pid_file, 'r') as f:
+                                            pid = int(f.read().strip())
+                                    if pid == self._pid:
+                                            os.remove(self.pid_file)
+                    except:
+                            pass
+                    # 仅主实例清理请求文件（非主实例的release会误删刚写入的激活请求）
+                    if self.is_primary:
+                            try:
+                                    if os.path.exists(self.request_file):
+                                            os.remove(self.request_file)
+                            except:
+                                    pass
+
     def __del__(self):
         self.release()
