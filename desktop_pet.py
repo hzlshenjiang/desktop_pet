@@ -276,7 +276,7 @@ class BubbleLabel(QLabel):
         painter.setPen(QColor(30, 30, 30))
         painter.setFont(self.font())
         text_rect = rect.adjusted(10, 5, -10, -10)
-        painter.drawText(text_rect, Qt.AlignCenter, self.text())
+        painter.drawText(text_rect, Qt.AlignCenter | Qt.TextWordWrap, self.text())
 
 
 class PetWidget(QWidget):
