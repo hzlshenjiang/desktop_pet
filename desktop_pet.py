@@ -244,11 +244,24 @@ class BubbleLabel(QLabel):
     def show_text(self, text, duration=2000):
         self.setText(text)
         metrics = QFontMetrics(self.font())
-        avail_width = self.maximumWidth() - 20
-        text_rect = metrics.boundingRect(0, 0, avail_width, 10000,
-                                         Qt.TextWordWrap, text)
-        bubble_w = text_rect.width() + 20
-        bubble_h = text_rect.height() + 18
+        max_w = self.maximumWidth()  # 260
+        padding = 20  # 左右边距各10px
+        avail_w = max_w - padding  # 文字可用宽度
+
+        # 单行所需宽度
+        single_w = metrics.horizontalAdvance(text)
+
+        if single_w + padding <= max_w:
+            # 短文本：气泡宽度=文字宽度+边距，单行显示
+            bubble_w = single_w + padding
+            bubble_h = metrics.height() + 18
+        else:
+            # 长文本：气泡宽度=最大宽度，文字换行
+            text_rect = metrics.boundingRect(0, 0, avail_w, 10000,
+                                             Qt.TextWordWrap, text)
+            bubble_w = max_w
+            bubble_h = text_rect.height() + 18
+
         self.resize(bubble_w, bubble_h)
         self.show()
         self.timer.start(duration)
