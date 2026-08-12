@@ -234,6 +234,8 @@ class BubbleLabel(QLabel):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setFont(QFont(self.font_name, 10))
         self.setAlignment(Qt.AlignCenter)
+        self.setWordWrap(True)
+        self.setMaximumWidth(260)
         self.hide()
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
@@ -241,32 +243,16 @@ class BubbleLabel(QLabel):
 
     def show_text(self, text, duration=2000):
         self.setText(text)
-        self.adjustSize()
+        # 根据文字内容计算合适的气泡宽高
+        metrics = QFontMetrics(self.font())
+        avail_width = self.maximumWidth() - 20  # 左右留白
+        text_rect = metrics.boundingRect(0, 0, avail_width, 10000,
+                                         Qt.TextWordWrap, text)
+        bubble_w = text_rect.width() + 20
+        bubble_h = text_rect.height() + 18  # 上下留白 + 气泡尾巴
+        self.resize(bubble_w, bubble_h)
         self.show()
         self.timer.start(duration)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        rect = self.rect().adjusted(1, 1, -1, -1)
-        painter.setBrush(QColor(255, 255, 255, 240))
-        painter.setPen(QColor(200, 200, 200))
-        painter.drawRoundedRect(rect, 12, 12)
-        painter.setBrush(QColor(255, 255, 255, 240))
-        painter.setPen(Qt.NoPen)
-        tail_x = rect.width() // 2
-        tail_y = rect.height() - 2
-        tail = QPolygon([
-            QPoint(tail_x - 8, tail_y),
-            QPoint(tail_x + 8, tail_y),
-            QPoint(tail_x, tail_y + 8)
-        ])
-        painter.drawPolygon(tail)
-        painter.setPen(QColor(51, 51, 51))
-        painter.setFont(self.font())
-        text_rect = rect.adjusted(10, 5, -10, -10)
-        painter.drawText(text_rect, Qt.AlignCenter, self.text())
-
 
 class PetWidget(QWidget):
     def __init__(self):
@@ -410,12 +396,13 @@ class PetWidget(QWidget):
         QApplication.quit()
 
     def show_bubble(self):
-        text = random.choice(DIALOGUES)
-        duration = max(2000, 2000 + len(text) * 100)
-        bubble_x = self.x() + self.width() // 2 - self.bubble.width() // 2
-        bubble_y = self.y() - self.bubble.height() - 10
-        self.bubble.move(bubble_x, bubble_y)
-        self.bubble.show_text(text, duration)
+                    text = random.choice(DIALOGUES)
+                    duration = max(2000, 2000 + len(text) * 100)
+                    # 先设置文字确定大小，再计算位置
+                    self.bubble.show_text(text, duration)
+                    bubble_x = self.x() + self.width() // 2 - self.bubble.width() // 2
+                    bubble_y = self.y() - self.bubble.height() - 10
+                    self.bubble.move(bubble_x, bubble_y)
 
     # ===== 常态动画 =====
     def init_idle_animation(self):
